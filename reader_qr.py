@@ -13,27 +13,21 @@ def find_code_by_name(name, refer_code, file_path):
         print("Error reading file:", err)
         return ""
     
-    # Chuyển name về chữ thường để so sánh không phân biệt hoa/thường
     name_lower = name.lower()
-
-    # Lọc các item có key chứa tên cần tìm
     result = [
         item for item in result_data
         if any(name_lower in key.lower() for key in item.keys())
     ]
 
-    # Nếu không tìm thấy kết quả
     if not result:
         return ""
 
-    # Nếu chỉ có 1 kết quả
     if len(result) == 1:
         key = next((k for k in result[0] if name_lower in k.lower()), None)
         if key:
             values = result[0][key].split(", ")
             return values[0] if len(values) > 1 else result[0][key]
 
-    # Nếu có nhiều kết quả, tìm theo refer_code
     if len(result) > 1:
         result_with_refer_code = next((
             item for item in result
@@ -48,6 +42,21 @@ def find_code_by_name(name, refer_code, file_path):
             return result_with_refer_code[key].replace(f", {refer_code}", "")
 
     return ""
+
+def find_ky_tu_tinh(tinh_name):
+    try:
+        with open('data/ky_tu_tinh.json', 'r', encoding='utf-8') as file:
+            ky_tu_data = json.load(file)
+        
+        tinh_lower = tinh_name.lower()
+        for item in ky_tu_data:
+            key = next(iter(item))  # Lấy key đầu tiên trong dictionary
+            if tinh_lower == key.lower():
+                return item[key]
+        return ""  # Trả về rỗng nếu không tìm thấy
+    except Exception as e:
+        print(f"Error reading ky_tu_tinh.json: {str(e)}")
+        return ""
 
 def qr_code_reader(path):
     try:
@@ -82,13 +91,25 @@ def qr_code_reader(path):
         ma_huyen = find_code_by_name(huyen, ma_tinh, 'data/quan_huyen.json')
         ma_xa = find_code_by_name(xa_phuong_name, ma_huyen, 'data/xa_phuong.json')
 
+
+        ky_tu_tinh = find_ky_tu_tinh(tinh)
+
+        # Xử lý giới tính
+        gioi_tinh = fields[4]
+        if gioi_tinh.lower() == "nam":
+            gioi_tinh = "M"
+        elif gioi_tinh.lower() == "nữ":
+            gioi_tinh = "F"
+
+
         result = {
             "cccd": fields[0],
             "ngay_cccd": ngaycccd,
-            "ten": fields[2],
+            "ho_ten": fields[2],
             "ngay_sinh": fields[3],
-            "gioi_tinh": fields[4],
+            "gioi_tinh": gioi_tinh,
             "tinh": tinh,
+            "ky_tu_tinh": ky_tu_tinh,
             "ma_tinh": ma_tinh,
             "huyen": huyen,
             "ma_huyen": ma_huyen,
@@ -111,10 +132,10 @@ for filename in os.listdir(image_folder):
         file_path = os.path.join(image_folder, filename)
         try:
             qr_result = qr_code_reader(file_path)
-            if isinstance(qr_result, str):  # Nếu kết quả là string, nghĩa là có lỗi
+            if isinstance(qr_result, str):
                 error_images[filename] = qr_result
                 print(f"Error processing {filename}: {qr_result}")
-            else:  # Nếu kết quả là dict, xử lý thành công
+            else:
                 results[filename] = qr_result
                 print(f"Processed {filename}: {qr_result}")
         except Exception as e:
