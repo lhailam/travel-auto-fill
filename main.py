@@ -1,5 +1,7 @@
 from pynput.keyboard import Controller, Key
 import time
+import json
+from datetime import datetime
 
 keyboard = Controller()
 
@@ -7,7 +9,7 @@ def type_vietnamese(text):
     for char in text:
         keyboard.press(char)
         keyboard.release(char)
-        time.sleep(0.05)
+        time.sleep(0.1)
 
 def vietnamese_to_telex(text):
     telex_map = {
@@ -62,23 +64,32 @@ def press_enter():
     keyboard.release(Key.enter)
     time.sleep(0.2)
 
-all_forms = [
-    [  # Form 1
-        {"text": "TLT-01", "tab": True, "enter": None},
-        {"text": vietnamese_to_telex("lê hải lâm"), "tab": True, "enter": None},
-        {"text": "M", "tab": True, "enter": None},
-        {"text": "08062000", "tab": None, "enter": None},
+try:
+    with open('result_infomations.json', 'r', encoding='utf-8') as json_file:
+        results_data = json.load(json_file)
+except Exception as e:
+    print(f"Error reading result_infomations.json: {str(e)}")
+    exit()
+
+current_date = datetime.now().strftime("%d%m%Y")
+all_forms = []
+for filename, data in results_data.items():
+    form = [
+        {"text": "TLT-011", "tab": True, "enter": None},
+        {"text": vietnamese_to_telex(data["ho_ten"]), "tab": True, "enter": None},
+        {"text": data["gioi_tinh"], "tab": True, "enter": None},
+        {"text": data["ngay_sinh"], "tab": None, "enter": None},
         {"text": "D", "tab": True, "enter": None},
-        {"text": "HN", "tab": True, "enter": None},
+        {"text": data["ky_tu_tinh"], "tab": True, "enter": None},
         {"text": "1", "tab": True, "enter": None},
         {"text": "8", "tab": True, "enter": None},
-        {"text": "036054004330", "tab": None, "enter": None},
-        {"text": "10042021", "tab": None, "enter": None},
-        {"text": "HN", "tab": True, "enter": None},
-        {"text": "HN", "tab": True, "enter": None},
-        {"text": "10101", "tab": True, "enter": None},
-        {"text": "1010125", "tab": True, "enter": None},
-        {"text": vietnamese_to_telex("12 phú xuân 7"), "tab": True, "enter": None},
+        {"text": data["cccd"], "tab": None, "enter": None},
+        {"text": data["ngay_cccd"], "tab": None, "enter": None},
+        {"text": data["ky_tu_tinh"], "tab": True, "enter": None},
+        {"text": data["ky_tu_tinh"], "tab": True, "enter": None},
+        {"text": data["ma_huyen"], "tab": True, "enter": None},
+        {"text": data["ma_xa"], "tab": True, "enter": None},
+        {"text": vietnamese_to_telex(data["dia_chi"]), "tab": True, "enter": None},
         {"text": "", "tab": True, "enter": None},
         {"text": "1", "tab": True, "enter": None},
         {"text": "2", "tab": True, "enter": None},
@@ -87,36 +98,9 @@ all_forms = [
         {"text": "", "tab": True, "enter": None},
         {"text": "", "tab": True, "enter": None},
         {"text": "", "tab": True, "enter": None},
-        {"text": "31072023", "tab": None, "enter": True}
-    ],
-    [  # Form 2
-        {"text": "TLT-01", "tab": True, "enter": None},
-        {"text": vietnamese_to_telex("nguyễn thị kim"), "tab": True, "enter": None},
-        {"text": "M", "tab": True, "enter": None},
-        {"text": "05041995", "tab": None, "enter": None},
-        {"text": "D", "tab": True, "enter": None},
-        {"text": "HP", "tab": True, "enter": None},
-        {"text": "1", "tab": True, "enter": None},
-        {"text": "8", "tab": True, "enter": None},
-        {"text": "036054004330", "tab": None, "enter": None},
-        {"text": "10042021", "tab": None, "enter": None},
-        {"text": "HP", "tab": True, "enter": None},
-        {"text": "HP", "tab": True, "enter": None},
-        {"text": "10304", "tab": True, "enter": None},
-        {"text": "1030409", "tab": True, "enter": None},
-        {"text": vietnamese_to_telex("12 phú xuân 7"), "tab": True, "enter": None},
-        {"text": "", "tab": True, "enter": None},
-        {"text": "1", "tab": True, "enter": None},
-        {"text": "2", "tab": True, "enter": None},
-        {"text": vietnamese_to_telex("tự do"), "tab": True, "enter": None},
-        {"text": "", "tab": True, "enter": None},
-        {"text": "", "tab": True, "enter": None},
-        {"text": "", "tab": True, "enter": None},
-        {"text": "", "tab": True, "enter": None},
-        {"text": "31072023", "tab": None, "enter": None}
+        {"text": current_date, "tab": None, "enter": True}
     ]
-    
-]
+    all_forms.append(form)
 
 print("Chuẩn bị gõ tự động sau 5 giây...")
 time.sleep(5)
