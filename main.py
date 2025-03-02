@@ -9,7 +9,7 @@ def type_vietnamese(text):
     for char in text:
         keyboard.press(char)
         keyboard.release(char)
-        time.sleep(0.1)
+        time.sleep(0.15)
 
 def vietnamese_to_telex(text):
     telex_map = {
@@ -57,12 +57,12 @@ def vietnamese_to_telex(text):
 def press_tab():
     keyboard.press(Key.tab)
     keyboard.release(Key.tab)
-    time.sleep(0.2)
+    time.sleep(0.1)
 
 def press_enter():
     keyboard.press(Key.enter)
     keyboard.release(Key.enter)
-    time.sleep(0.2)
+    time.sleep(0.1)
 
 try:
     with open('result_infomations.json', 'r', encoding='utf-8') as json_file:
@@ -104,21 +104,22 @@ for filename, data in results_data.items():
 
 print("Chuẩn bị gõ tự động sau 5 giây...")
 time.sleep(5)
-
+total_all_forms = len(all_forms)
 for form_idx, form_data in enumerate(all_forms):
-    print(f"Đang điền Form {form_idx + 1}:")
+    total_form_data = len(form_data)
     for i, field in enumerate(form_data):
         text = field["text"]
         should_tab = field.get("tab")
         should_enter = field.get("enter")
-        print(f"  Field {i+1}: {text}")
         type_vietnamese(text)
+        if form_idx == (total_all_forms-1) and i == (total_form_data-1):
+            break
         if should_tab:
             press_tab()
         elif should_enter:
             press_enter()
     if form_idx < len(all_forms) - 1:
         print(f"Đã xong Form {form_idx + 1}. Chờ 2 giây để sang form tiếp theo...")
-        time.sleep(2)
+        time.sleep(1)
 
 print("Đã gõ xong tất cả các form!")
