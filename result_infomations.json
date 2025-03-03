@@ -1,5 +1,5 @@
 {
-    "test1.jpg": {
+    "D:/TLT/travel-auto-fill/images/test1.jpg": {
         "cccd": "020192000654",
         "ngay_cccd": "29032021",
         "ho_ten": "Phạm Thị Thanh Mai",
@@ -14,53 +14,5 @@
         "ma_xa": "2090101",
         "dia_chi": "Khối 7",
         "data": "020192000654|082113520|Phạm Thị Thanh Mai|26051992|Nữ|98 Bà Triệu, Khối 7, Hoàng Văn Thụ, Thành phố Lạng Sơn, Lạng Sơn|29032021"
-    },
-    "test2.jpg": {
-        "cccd": "020193008520",
-        "ngay_cccd": "07092022",
-        "ho_ten": "Vũ Thùy Trang",
-        "ngay_sinh": "15121993",
-        "gioi_tinh": "F",
-        "tinh": "Lạng Sơn",
-        "ky_tu_tinh": "LS",
-        "ma_tinh": "209",
-        "huyen": "TP. Lạng Sơn",
-        "ma_huyen": "20901",
-        "xa": "Tam Thanh",
-        "ma_xa": "2090103",
-        "dia_chi": "Khối 1",
-        "data": "020193008520|082178152|Vũ Thùy Trang|15121993|Nữ|13/2 Phố Muối, Khối 1, Tam Thanh, TP. Lạng Sơn, Lạng Sơn|07092022"
-    },
-    "test3.jpg": {
-        "cccd": "020300001095",
-        "ngay_cccd": "29042021",
-        "ho_ten": "Nông Thúy Vân",
-        "ngay_sinh": "04112000",
-        "gioi_tinh": "F",
-        "tinh": "Lạng Sơn",
-        "ky_tu_tinh": "LS",
-        "ma_tinh": "209",
-        "huyen": "Văn Lãng",
-        "ma_huyen": "20905",
-        "xa": "Hoàng Văn Thụ",
-        "ma_xa": "2090523",
-        "dia_chi": "Thôn Nà Phiêng",
-        "data": "020300001095|082324537|Nông Thúy Vân|04112000|Nữ|Thôn Nà Phiêng,  Hoàng Văn Thụ, Văn Lãng, Lạng Sơn|29042021"
-    },
-    "test4.jpg": {
-        "cccd": "045190000227",
-        "ngay_cccd": "20122021",
-        "ho_ten": "Trương Thị Thủy",
-        "ngay_sinh": "09021990",
-        "gioi_tinh": "F",
-        "tinh": "Bà Rịa - Vũng Tàu",
-        "ky_tu_tinh": "VT",
-        "ma_tinh": "717",
-        "huyen": "Thị xã Phú Mỹ",
-        "ma_huyen": "71709",
-        "xa": "Phú Mỹ",
-        "ma_xa": "7170901",
-        "dia_chi": "Tân Hạnh",
-        "data": "045190000227|273688610|Trương Thị Thủy|09021990|Nữ|Tân Hạnh, Phú Mỹ, Thị xã Phú Mỹ, Bà Rịa - Vũng Tàu|20122021"
     }
 }
