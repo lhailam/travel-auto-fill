@@ -73,12 +73,12 @@ class WorkerThread(QThread):
                 break
             self.keyboard.press(char)
             self.keyboard.release(char)
-            time.sleep(0.15)
+            time.sleep(0.2)
 
     def press_tab(self):
         self.keyboard.press(Key.tab)
         self.keyboard.release(Key.tab)
-        time.sleep(0.1)
+        time.sleep(0.15)
 
     def press_enter(self):
         self.keyboard.press(Key.enter)
@@ -206,7 +206,7 @@ class WorkerThread(QThread):
             all_forms = []
             for filename, data in results_data.items():
                 form = [
-                    {"text": self.cong_van, "tab": True, "enter": None},  # Dùng số công văn từ text box
+                    {"text": self.cong_van, "tab": True, "enter": None},
                     {"text": self.vietnamese_to_telex(data["ho_ten"]), "tab": True, "enter": None},
                     {"text": data["gioi_tinh"], "tab": True, "enter": None},
                     {"text": data["ngay_sinh"], "tab": None, "enter": None},
@@ -315,6 +315,7 @@ class MainWindow(QMainWindow):
         self.worker = None
 
     def select_images(self):
+        self.log_text.append("Đang xử lý...")
         files, _ = QFileDialog.getOpenFileNames(self, "Chọn ảnh QR", "", "Image Files (*.png *.jpg *.jpeg *.bmp)")
         if files:
             self.image_files = files
