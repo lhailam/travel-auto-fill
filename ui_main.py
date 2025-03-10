@@ -112,7 +112,17 @@ class WorkerThread(QThread):
         except Exception as e:
             self.update_log.emit(f"Lỗi đọc {file_path}: {str(e)}")
             return ""
+    def find_xa_phuong_by_name(sefl, xa_phuong_name, ma_huyen, file_path):
+        with open(file_path, "r", encoding="utf-8") as file:
+            data = json.load(file)
 
+        for item in data:
+            for key, value in item.items():
+                codes = value.split(", ")
+                if ma_huyen in codes and xa_phuong_name in key:
+                    return key
+
+        return None  
     def find_ky_tu_tinh(self, tinh_name):
         try:
             with open('data/ky_tu_tinh.json', 'r', encoding='utf-8') as file:
@@ -153,14 +163,15 @@ class WorkerThread(QThread):
                 return "Địa chỉ không đầy đủ để phân tích"
             ma_tinh = self.find_code_by_name(tinh, None, 'data/tinh_tp.json')
             ma_huyen = self.find_code_by_name(huyen, ma_tinh, 'data/quan_huyen.json')
-            ma_xa = self.find_code_by_name(xa_phuong_name, ma_huyen, 'data/xa_phuong.json')
+            ten_xa = self.find_xa_phuong_by_name(xa_phuong_name, ma_huyen, 'data/xa_phuong.json')
+            print("ten_xa", ten_xa)
             ky_tu_tinh = self.find_ky_tu_tinh(tinh)
             gioi_tinh = "M" if fields[4].lower() == "nam" else "F"
             result = {
                 "cccd": fields[0], "ngay_cccd": ngaycccd, "ho_ten": fields[2],
                 "ngay_sinh": fields[3], "gioi_tinh": gioi_tinh, "tinh": tinh,
                 "ky_tu_tinh": ky_tu_tinh, "ma_tinh": ma_tinh, "huyen": huyen,
-                "ma_huyen": ma_huyen, "xa": xa_phuong_name, "ma_xa": ma_xa,
+                "ma_huyen": ma_huyen, "xa": xa_phuong_name, "ten_xa": ten_xa,
                 "dia_chi": dia_chi, "data": qr_data
             }
             return result
@@ -219,8 +230,8 @@ class WorkerThread(QThread):
                     {"text": data["ky_tu_tinh"], "tab": True, "enter": None},
                     {"text": data["ky_tu_tinh"], "tab": True, "enter": None},
                     {"text": data["ma_huyen"], "tab": True, "enter": None},
-                    {"text": data["ma_xa"], "tab": True, "enter": None},
-                    {"text": self.vietnamese_to_telex(data["dia_chi"]), "tab": True, "enter": None},
+                    {"text":"", "tab": True, "enter": None},
+                    {"text": self.vietnamese_to_telex(f"{data['dia_chi']}, {data['ten_xa']}"), "tab": True, "enter": None},
                     {"text": "", "tab": True, "enter": None},
                     {"text": "1", "tab": True, "enter": None},
                     {"text": "2", "tab": True, "enter": None},
