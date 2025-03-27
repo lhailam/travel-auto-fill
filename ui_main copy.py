@@ -2,7 +2,7 @@ import sys
 import os
 from PyQt5.QtWidgets import (QApplication, QMainWindow, QPushButton, QListWidget, 
                              QTextEdit, QFileDialog, QLabel, QProgressBar, QVBoxLayout, QWidget, QLineEdit)
-from PyQt5.QtCore import QThread, pyqtSignal, QMutex, QWaitCondition
+from PyQt5.QtCore import QThread, pyqtSignal
 from pynput.mouse import Listener as MouseListener
 from pynput.keyboard import Controller, Key
 import time
@@ -24,47 +24,15 @@ class WorkerThread(QThread):
     update_progress = pyqtSignal(int)
     update_log = pyqtSignal(str)
     finished = pyqtSignal()
-    error = pyqtSignal(str)
 
     def __init__(self, image_files=None, mode="read", cong_van="TLT-000", parent=None):
         super().__init__(parent)
         self.image_files = image_files
         self.mode = mode
-        self.cong_van = cong_van
+        self.cong_van = cong_van  # Số công văn từ text box
         self.running = True
         self.keyboard = Controller()
         self.qreader = QReader()
-        self._is_running = True
-        self._pause = False
-        self._lock = QMutex()
-        self._wait_condition = QWaitCondition()
-
-    def pause(self):
-        """Tạm dừng thread"""
-        self._lock.lock()
-        self._pause = True
-        self._lock.unlock()
-
-    def resume(self):
-        """Tiếp tục thread"""
-        self._lock.lock()
-        self._pause = False
-        self._lock.unlock()
-
-    def stop(self):
-        """Dừng thread"""
-        self._lock.lock()
-        self._is_running = False
-        self._pause = False
-        self._lock.unlock()
-        self.wait()
-
-    def is_running(self):
-        """Kiểm tra thread có đang chạy không"""
-        self._lock.lock()
-        is_running = self._is_running
-        self._lock.unlock()
-        return is_running
 
     def vietnamese_to_telex(self, text):
         telex_map = {
@@ -292,7 +260,6 @@ class WorkerThread(QThread):
             decoded_text = self.normalize_text(decoded_text)
 
             fields = decoded_text.split('|')
-            print("fields: ",fields)
             if len(fields) < 7:
                 return "Dữ liệu QR không đủ để phân tích"
 
@@ -347,29 +314,13 @@ class WorkerThread(QThread):
             return f"Lỗi xử lý QR code: {str(e)}"
 
     def run(self):
-        try:
-            if self.mode == "read":
-                self._run_read_mode()
-            elif self.mode == "type":
-                self._run_type_mode()
-        except Exception as e:
-            self.error.emit(f"Lỗi trong quá trình xử lý: {str(e)}")
-        finally:
-            self.finished.emit()
-
-    def _run_read_mode(self):
-        """Xử lý chế độ đọc QR"""
-        try:
+        if self.mode == "read":
             results = {}
             error_images = {}
             total_files = len(self.image_files)
-
             for idx, file_path in enumerate(self.image_files):
-                if not self.is_running():
+                if not self.running:
                     break
-
-                self._check_pause()
-
                 qr_result = self.qr_code_reader(file_path)
                 if isinstance(qr_result, str):
                     error_images[file_path] = qr_result
@@ -377,129 +328,93 @@ class WorkerThread(QThread):
                 else:
                     results[file_path] = qr_result
                     self.update_log.emit(f"Đang xử lý {os.path.basename(file_path)}: {qr_result['cccd']}")
-
                 self.update_progress.emit(int((idx + 1) / total_files * 100))
-
-            if self.is_running():
-                self._save_results(results, error_images)
-                self.update_log.emit("Đã xử lý xong kết quả")
+            if self.running:
+                with open('result_infomations.json', 'w', encoding='utf-8') as json_file:
+                    json.dump(results, json_file, ensure_ascii=False, indent=4)
+                if error_images:
+                    with open('error_images.json', 'w', encoding='utf-8') as error_file:
+                        json.dump(error_images, error_file, ensure_ascii=False, indent=4)
+                self.update_log.emit(f"Đã xử lý xong kết quả")
             else:
                 self.update_log.emit("Đã hủy đọc QR!")
 
-        except Exception as e:
-            self.error.emit(f"Lỗi trong chế độ đọc: {str(e)}")
-
-    def _run_type_mode(self):
-        """Xử lý chế độ nhập liệu"""
-        try:
-            if not os.path.exists('result_infomations.json'):
-                self.error.emit("Không tìm thấy file kết quả đọc QR!")
+        elif self.mode == "type":
+            try:
+                with open('result_infomations.json', 'r', encoding='utf-8') as json_file:
+                    results_data = json.load(json_file)
+            except Exception as e:
+                self.update_log.emit(f"Lỗi đọc data result_infomations.json: {str(e)}")
+                self.finished.emit()
                 return
 
-            with open('result_infomations.json', 'r', encoding='utf-8') as json_file:
-                results_data = json.load(json_file)
-
             current_date = datetime.now().strftime("%d%m%Y")
-            all_forms = self._prepare_forms(results_data, current_date)
+            all_forms = []
+            for filename, data in results_data.items():
+                form = [
+                    {"text": self.cong_van, "tab": True, "enter": None},
+                    {"text": self.vietnamese_to_telex(data["ho_ten"]), "tab": True, "enter": None},
+                    {"text": data["gioi_tinh"], "tab": True, "enter": None},
+                    {"text": data["ngay_sinh"], "tab": None, "enter": None},
+                    {"text": "D", "tab": True, "enter": None},
+                    {"text": data["ky_tu_tinh"], "tab": True, "enter": None},
+                    {"text": "1", "tab": True, "enter": None},
+                    {"text": "8", "tab": True, "enter": None},
+                    {"text": data["cccd"], "tab": None, "enter": None},
+                    {"text": data["ngay_cccd"], "tab": None, "enter": None},
+                    {"text": data["ky_tu_tinh"], "tab": True, "enter": None},
+                    {"text": data["ky_tu_tinh"], "tab": True, "enter": None},
+                    {"text": data["ma_huyen"], "tab": True, "enter": None},
+                    {"text":"", "tab": True, "enter": None},
+                    {"text": self.vietnamese_to_telex(f"{data['dia_chi']}, {data['ten_xa']}"), "tab": True, "enter": None},
+                    {"text": "", "tab": True, "enter": None},
+                    {"text": "1", "tab": True, "enter": None},
+                    {"text": "2", "tab": True, "enter": None},
+                    {"text": self.vietnamese_to_telex("tự do"), "tab": True, "enter": None},
+                    {"text": "", "tab": True, "enter": None},
+                    {"text": "", "tab": True, "enter": None},
+                    {"text": "", "tab": True, "enter": None},
+                    {"text": "", "tab": True, "enter": None},
+                    {"text": current_date, "tab": None, "enter": True}
+                ]
+                all_forms.append(form)
 
             self.update_log.emit("Click chuột trái vào ứng dụng thứ 3 để bắt đầu nhập...")
             with MouseListener(on_click=self.on_click) as listener:
                 listener.join()
 
-            self._process_forms(all_forms)
-
-        except Exception as e:
-            self.error.emit(f"Lỗi trong chế độ nhập: {str(e)}")
-
-    def _check_pause(self):
-        """Kiểm tra và xử lý tạm dừng"""
-        self._lock.lock()
-        while self._pause and self._is_running:
-            self._wait_condition.wait(self._lock)
-        self._lock.unlock()
-
-    def _save_results(self, results, error_images):
-        """Lưu kết quả xử lý"""
-        try:
-            with open('result_infomations.json', 'w', encoding='utf-8') as json_file:
-                json.dump(results, json_file, ensure_ascii=False, indent=4)
-            if error_images:
-                with open('error_images.json', 'w', encoding='utf-8') as error_file:
-                    json.dump(error_images, error_file, ensure_ascii=False, indent=4)
-        except Exception as e:
-            self.error.emit(f"Lỗi khi lưu kết quả: {str(e)}")
-
-    def _prepare_forms(self, results_data, current_date):
-        """Chuẩn bị dữ liệu form"""
-        all_forms = []
-        for data in results_data.values():
-            form = [
-                {"text": self.cong_van, "tab": True, "enter": None},
-                {"text": self.vietnamese_to_telex(data["ho_ten"]), "tab": True, "enter": None},
-                {"text": data["gioi_tinh"], "tab": True, "enter": None},
-                {"text": data["ngay_sinh"], "tab": None, "enter": None},
-                {"text": "D", "tab": True, "enter": None},
-                {"text": data["ky_tu_tinh"], "tab": True, "enter": None},
-                {"text": "1", "tab": True, "enter": None},
-                {"text": "8", "tab": True, "enter": None},
-                {"text": data["cccd"], "tab": None, "enter": None},
-                {"text": data["ngay_cccd"], "tab": None, "enter": None},
-                {"text": data["ky_tu_tinh"], "tab": True, "enter": None},
-                {"text": data["ky_tu_tinh"], "tab": True, "enter": None},
-                {"text": data["ma_huyen"], "tab": True, "enter": None},
-                {"text": "", "tab": True, "enter": None},
-                {"text": self.vietnamese_to_telex(f"{data['dia_chi']}, {data['ten_xa']}"), "tab": True, "enter": None},
-                {"text": "", "tab": True, "enter": None},
-                {"text": "1", "tab": True, "enter": None},
-                {"text": "2", "tab": True, "enter": None},
-                {"text": self.vietnamese_to_telex("tự do"), "tab": True, "enter": None},
-                {"text": "", "tab": True, "enter": None},
-                {"text": "", "tab": True, "enter": None},
-                {"text": "", "tab": True, "enter": None},
-                {"text": "", "tab": True, "enter": None},
-                {"text": current_date, "tab": None, "enter": True}
-            ]
-            all_forms.append(form)
-        return all_forms
-
-    def _process_forms(self, all_forms):
-        """Xử lý nhập liệu form"""
-        total_forms = len(all_forms)
-        for idx, form_data in enumerate(all_forms):
-            if not self.is_running():
-                break
-
-            self._check_pause()
-
-            total_fields = len(form_data)
-            for i, field in enumerate(form_data):
-                if not self.is_running():
+            total_forms = len(all_forms)
+            for idx, form_data in enumerate(all_forms):
+                if not self.running:
                     break
+                total_fields = len(form_data)
+                for i, field in enumerate(form_data):
+                    if not self.running:
+                        break
+                    self.type_text(field["text"])
+                    if idx == total_forms - 1 and i == total_fields - 1:
+                        break
+                    if field.get("tab"):
+                        self.press_tab()
+                    elif field.get("enter"):
+                        self.press_enter()
+                self.update_progress.emit(int((idx + 1) / total_forms * 100))
+                if idx < total_forms - 1:
+                    self.update_log.emit(f"Đã xong Form {idx + 1}")
+                    time.sleep(1)
+            if self.running:
+                self.update_log.emit("Đã gõ xong tất cả các form!")
+            else:
+                self.update_log.emit("Đã hủy nhập form!")
 
-                self._check_pause()
-
-                self.type_text(field["text"])
-                if idx == total_forms - 1 and i == total_fields - 1:
-                    break
-                if field.get("tab"):
-                    self.press_tab()
-                elif field.get("enter"):
-                    self.press_enter()
-
-            self.update_progress.emit(int((idx + 1) / total_forms * 100))
-            if idx < total_forms - 1:
-                self.update_log.emit(f"Đã xong Form {idx + 1}")
-                time.sleep(1)
-
-        if self.is_running():
-            self.update_log.emit("Đã gõ xong tất cả các form!")
-        else:
-            self.update_log.emit("Đã hủy nhập form!")
+        self.finished.emit()
 
     def on_click(self, x, y, button, pressed):
-        """Xử lý sự kiện click chuột"""
         if pressed and str(button) == "Button.left":
             return False
+
+    def stop(self):
+        self.running = False
 
 # Giao diện chính
 class MainWindow(QMainWindow):
