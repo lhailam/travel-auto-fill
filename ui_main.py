@@ -15,6 +15,7 @@ import ftfy
 import unicodedata
 import os
 from google.cloud import vision
+import requests
 
 
 os.environ['GOOGLE_APPLICATION_CREDENTIALS'] = "google_auth.json"
@@ -419,13 +420,30 @@ class WorkerThread(QThread):
         self._lock.unlock()
 
     def _save_results(self, results, error_images):
-        """Lưu kết quả xử lý"""
+        """Lưu kết quả xử lý và gửi lên server"""
         try:
+            # Lưu vào file local như cũ
             with open('result_infomations.json', 'w', encoding='utf-8') as json_file:
                 json.dump(results, json_file, ensure_ascii=False, indent=4)
             if error_images:
                 with open('error_images.json', 'w', encoding='utf-8') as error_file:
                     json.dump(error_images, error_file, ensure_ascii=False, indent=4)
+            
+            # Gửi dữ liệu lên server
+            for data in results.values():
+                try:
+                    response = requests.post(
+                        'http://localhost:5000/save_user',
+                        json=data,
+                        headers={'Content-Type': 'application/json'}
+                    )
+                    if response.status_code == 200:
+                        self.update_log.emit(f"Đã lưu thông tin {data['ho_ten']} lên server")
+                    else:
+                        self.update_log.emit(f"Lỗi khi lưu lên server: {response.json().get('error', 'Unknown error')}")
+                except Exception as e:
+                    self.update_log.emit(f"Lỗi kết nối server: {str(e)}")
+                    
         except Exception as e:
             self.error.emit(f"Lỗi khi lưu kết quả: {str(e)}")
 
@@ -640,6 +658,11 @@ class MainWindow(QMainWindow):
         if self.worker and self.worker.isRunning():
             self.worker.stop()
             self.worker.wait()
+        
+        # Dừng server khi đóng ứng dụng
+        if hasattr(self, 'server'):
+            self.server.stop()
+            
         event.accept()
 
 if __name__ == "__main__":
