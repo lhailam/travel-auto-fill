@@ -16,6 +16,7 @@ import unicodedata
 import os
 from google.cloud import vision
 import requests
+import random
 
 
 os.environ['GOOGLE_APPLICATION_CREDENTIALS'] = "google_auth.json"
@@ -112,9 +113,13 @@ class WorkerThread(QThread):
         for char in text:
             if not self.running:
                 break
+            
+            # Thêm độ trễ ngẫu nhiên để mô phỏng gõ tự nhiên hơn
+            delay = 0.25 + (random.random() * 0.1)  # Độ trễ từ 0.25-0.35s
+            
             self.keyboard.press(char)
             self.keyboard.release(char)
-            time.sleep(0.25)
+            time.sleep(delay)
 
     def press_tab(self):
         self.keyboard.press(Key.tab)
