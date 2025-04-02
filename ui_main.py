@@ -17,6 +17,13 @@ import os
 from google.cloud import vision
 import requests
 import random
+from flask import Flask, request, jsonify
+import threading
+import mysql.connector
+from mysql.connector import Error
+from sqlalchemy import create_engine
+from sqlalchemy.exc import SQLAlchemyError
+from sqlalchemy import text
 
 
 os.environ['GOOGLE_APPLICATION_CREDENTIALS'] = "google_auth.json"
@@ -345,7 +352,7 @@ class WorkerThread(QThread):
                 "ngay_sinh": fields[3], "gioi_tinh": gioi_tinh, "tinh": tinh,
                 "ky_tu_tinh": ky_tu_tinh, "ma_tinh": ma_tinh, "huyen": huyen,
                 "ma_huyen": ma_huyen, "xa": xa_phuong_name, "ten_xa": ten_xa,
-                "dia_chi": dia_chi, "data": decoded_text
+                "dia_chi": dia_chi, "data": decoded_text, "cong_van": self.cong_van
             }
             return result
             
@@ -524,6 +531,211 @@ class WorkerThread(QThread):
         if pressed and str(button) == "Button.left":
             return False
 
+# Thêm class WebServerThread
+class WebServerThread(QThread):
+    def __init__(self, port=5000):
+        super().__init__()
+        self.port = port
+        self.app = Flask(__name__)
+        self._running = True  # Thêm flag để kiểm soát server
+        
+        # Cấu hình database
+        self.DB_USER = "user"
+        self.DB_PASSWORD = "password" 
+        self.DB_HOST = "14.225.206.102"
+        self.DB_NAME = "travel_web"
+        
+        # Tạo URL kết nối
+        self.DATABASE_URL = f"mysql+pymysql://{self.DB_USER}:{self.DB_PASSWORD}@{self.DB_HOST}/{self.DB_NAME}"
+        
+        # Move route definitions inside __init__
+        self.setup_routes()
+
+    def setup_routes(self):
+        # Define routes using add_url_rule instead of decorators
+        self.app.add_url_rule('/', 'hello', self.hello)
+        self.app.add_url_rule('/save_user', 'save_user', self.save_user, methods=['POST'])
+
+    def hello(self):
+        try:
+            print("\n=== Testing Database Connection ===")
+            engine = self.create_db_engine()
+            if engine:
+                with engine.connect() as connection:
+                    result = connection.execute(text("SELECT VERSION()"))
+                    version = result.scalar()
+                    print(f"Connected to MySQL version: {version}")
+                    return f"Successfully connected to MySQL!\nServer version: {version}"
+            return "Failed to create database engine"
+            
+        except SQLAlchemyError as e:
+            error = str(e.__dict__['orig'])
+            print(f"Database error: {error}")
+            return f"Database error: {error}"
+        except Exception as e:
+            print(f"Unexpected error: {str(e)}")
+            return f"Error: {str(e)}"
+
+    def create_db_engine(self):
+        """Tạo engine kết nối database"""
+        try:
+            print("Creating database engine...")
+            engine = create_engine(
+                self.DATABASE_URL,
+                pool_recycle=3600,
+                pool_size=5,
+                max_overflow=10,
+                pool_timeout=30,
+                pool_pre_ping=True
+            )
+            print("Engine created successfully")
+            return engine
+        except Exception as e:
+            print(f"Error creating engine: {str(e)}")
+            return None
+
+    def test_connection(self):
+        """Test kết nối database"""
+        try:
+            engine = self.create_db_engine()
+            if engine:
+                with engine.connect() as connection:
+                    # Test basic connectivity - use text() for raw SQL
+                    result = connection.execute(text("SELECT 1"))
+                    result.fetchone()
+                    
+                    # Get server version - use text() for raw SQL
+                    version_result = connection.execute(text("SELECT VERSION()"))
+                    version = version_result.scalar()
+                    print(f"Connected to MySQL version: {version}")
+                    
+                    # Test if customers table exists - use text() for raw SQL
+                    try:
+                        table_result = connection.execute(text("SHOW TABLES LIKE 'customers'"))
+                        if table_result.fetchone():
+                            print("Customers table exists")
+                        else:
+                            print("Customers table not found")
+                    except Exception as table_error:
+                        print(f"Error checking customers table: {str(table_error)}")
+                    
+                    print("Connection test successful!")
+                    return True
+            return False
+        except Exception as e:
+            print(f"Connection test failed: {str(e)}")
+            return False
+
+    @staticmethod
+    def convert_date_format(date_str):
+        """Convert date from DDMMYYYY to YYYY-MM-DD format"""
+        try:
+            if not date_str:
+                return None
+            return datetime.strptime(date_str, '%d%m%Y').strftime('%Y-%m-%d')
+        except ValueError:
+            print(f"Invalid date format: {date_str}")
+            return None
+
+
+    def save_user(self):
+        try:
+            data = request.json
+            print("Call API save_user")
+            # Validate required fields
+            required_fields = ['ho_ten', 'cccd', 'dia_chi']
+            for field in required_fields:
+                if field not in data:
+                    return jsonify({'error': f'Missing required field: {field}'}), 400
+
+            engine = self.create_db_engine()
+            if not engine:
+                return jsonify({'error': 'Database connection failed'}), 500
+            
+            # Convert dates
+            ngay_cccd = self.convert_date_format(data['ngay_cccd'])
+            ngay_sinh = self.convert_date_format(data['ngay_sinh'])
+            
+            if ngay_cccd is None or ngay_sinh is None:
+                return jsonify({'error': 'Invalid date format. Use DDMMYYYY'}), 400
+
+            # Construct full address
+            full_address = f"{data['dia_chi']}, {data.get('xa', '')}, {data.get('huyen', '')}, {data.get('tinh', '')}"
+            gioitinh = 'Nam' if data['gioi_tinh'] == 'M' else 'Nữ'
+            national = ''
+            ma_xa = ''
+            documentNumber = data['cong_van']        
+            current_time = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+            
+            # Insert user data using SQLAlchemy
+            insert_query = text("""
+            INSERT INTO customers (
+                documentNumber, cardID, createdAtCard, dayOfBirth, fullName, 
+                gender, national, province, district, commune, provinceCode, 
+                districtCode, communeCode, address, createdAt, updatedAt, deletedAt
+            ) VALUES (
+                :doc_num, :card_id, :created_at_card, :dob, :full_name,
+                :gender, :national, :province, :district, :commune, :province_code,
+                :district_code, :commune_code, :address, :created_at, :updated_at, :deleted_at
+            )
+            """)
+            
+            with engine.connect() as connection:
+                connection.execute(insert_query, {
+                    'doc_num': documentNumber,
+                    'card_id': data['cccd'],
+                    'created_at_card': ngay_cccd,
+                    'dob': ngay_sinh,
+                    'full_name': data['ho_ten'],
+                    'gender': gioitinh,
+                    'national': national,
+                    'province': data['tinh'],
+                    'district': data['huyen'],
+                    'commune': data['xa'],
+                    'province_code': data['ma_tinh'],
+                    'district_code': data['ma_huyen'],
+                    'commune_code': ma_xa,
+                    'address': full_address,
+                    'created_at': current_time,
+                    'updated_at': current_time,
+                    'deleted_at': None
+                })
+                connection.commit()
+            
+            print("User information saved successfully")
+            return jsonify({'message': 'User information saved successfully'}), 200
+            
+        except SQLAlchemyError as e:
+            error_msg = str(e.__dict__['orig'])
+            if 'Duplicate entry' in error_msg:
+                return jsonify({'error': 'CCCD already exists'}), 409
+            return jsonify({'error': f'Database error: {error_msg}'}), 500
+        except Exception as e:
+            return jsonify({'error': str(e)}), 500
+
+    def run(self):
+        if self.test_connection():
+            print("Database connection verified, starting server...")
+            # Chạy server trong thread riêng để có thể dừng
+            server_thread = threading.Thread(target=self.run_server)
+            server_thread.daemon = True  # Đảm bảo thread sẽ dừng khi chương trình chính dừng
+            server_thread.start()
+        else:
+            print("Failed to connect to database, server not started")
+
+    def run_server(self):
+        """Chạy Flask server trong một thread riêng"""
+        from werkzeug.serving import make_server
+        self.server = make_server('0.0.0.0', self.port, self.app)
+        self.server.serve_forever()
+
+    def stop(self):
+        """Dừng server an toàn"""
+        if hasattr(self, 'server'):
+            print("Shutting down Flask server...")
+            self.server.shutdown()
+            print("Flask server stopped")
+
 # Giao diện chính
 class MainWindow(QMainWindow):
     def __init__(self):
@@ -534,6 +746,11 @@ class MainWindow(QMainWindow):
         # Khởi tạo các biến
         self.image_files = []
         self.worker = None
+        
+        # Khởi tạo web server thread
+        self.web_server = WebServerThread()
+        self.web_server.start()
+        
         self.setup_ui()
         
     def setup_ui(self):
@@ -592,8 +809,11 @@ class MainWindow(QMainWindow):
                 
             self.log_text.append(f"Đã chọn {len(files)} ảnh.")
             
-            # Khởi tạo và chạy worker thread
-            self.worker = WorkerThread(self.image_files, mode="read")
+            # Lấy số công văn từ input và truyền vào WorkerThread
+            cong_van = self.cong_van_input.text().strip()
+            
+            # Khởi tạo và chạy worker thread với số công văn
+            self.worker = WorkerThread(self.image_files, mode="read", cong_van=cong_van)
             self.worker.update_progress.connect(self.progress_bar.setValue)
             self.worker.update_log.connect(self.log_text.append)
             self.worker.finished.connect(self.read_finished)
@@ -660,15 +880,25 @@ class MainWindow(QMainWindow):
         
     def closeEvent(self, event):
         """Xử lý sự kiện đóng cửa sổ"""
-        if self.worker and self.worker.isRunning():
-            self.worker.stop()
-            self.worker.wait()
-        
-        # Dừng server khi đóng ứng dụng
-        if hasattr(self, 'server'):
-            self.server.stop()
+        try:
+            # Dừng worker thread nếu đang chạy
+            if self.worker and self.worker.isRunning():
+                print("Stopping worker thread...")
+                self.worker.stop()
+                self.worker.wait()
+                print("Worker thread stopped")
             
-        event.accept()
+            # Dừng web server
+            if hasattr(self, 'web_server'):
+                print("Stopping web server...")
+                self.web_server.stop()
+                self.web_server.wait()
+                print("Web server stopped")
+                
+            event.accept()
+        except Exception as e:
+            print(f"Error during shutdown: {str(e)}")
+            event.accept()  # Vẫn chấp nhận đóng ứng dụng ngay cả khi có lỗi
 
 if __name__ == "__main__":
     app = QApplication(sys.argv)

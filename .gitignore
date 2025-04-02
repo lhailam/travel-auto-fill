@@ -9,7 +9,10 @@ __pycache__/
 
 # C extensions
 *.so
-
+*.exe
+*.zip
+images/
+Auto-Typer-*/
 # Distribution / packaging
 .Python
 build/
