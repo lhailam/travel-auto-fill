@@ -666,16 +666,15 @@ class WebServerThread(QThread):
             ma_xa = ''
             documentNumber = data['cong_van']        
             current_time = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
-            
             # Insert user data using SQLAlchemy
             insert_query = text("""
             INSERT INTO customers (
                 documentNumber, cardID, createdAtCard, dayOfBirth, fullName, 
-                gender, national, province, district, commune, provinceCode, 
+                gender, national, village, province, district, commune, provinceCode, 
                 districtCode, communeCode, address, createdAt, updatedAt, deletedAt
             ) VALUES (
                 :doc_num, :card_id, :created_at_card, :dob, :full_name,
-                :gender, :national, :province, :district, :commune, :province_code,
+                :gender, :national, :village, :province, :district, :commune, :province_code,
                 :district_code, :commune_code, :address, :created_at, :updated_at, :deleted_at
             )
             """)
@@ -689,6 +688,7 @@ class WebServerThread(QThread):
                     'full_name': data['ho_ten'],
                     'gender': gioitinh,
                     'national': national,
+                    'village': data['dia_chi'],
                     'province': data['tinh'],
                     'district': data['huyen'],
                     'commune': data['xa'],
